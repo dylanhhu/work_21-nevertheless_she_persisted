@@ -18,21 +18,22 @@ int server_handshake(int *to_client) {
     exit(EXIT_FAILURE);
   }
 
-  printf("created well known pipe. opening the pipe for reading...\n");
+  printf("created well known pipe.\n\nopening the pipe for reading...\n");
   wkp = open(WKP, O_RDONLY);
   if (wkp < 0) {
     printf("couldn't open well known pipe (%s, %d)\n", strerror(errno), errno);
     exit(EXIT_FAILURE);
   }
 
-  printf("opened well known pipe, reading...\n");
+  printf("opened well known pipe\n\nreading from well known pipe...\n");
   char handshake[HANDSHAKE_BUFFER_SIZE];
   int r = read(wkp, handshake, sizeof(handshake));
+  handshake[r] = 0;
 
-  printf("recieved secret pipe info, removing well known pipe...\n");
+  printf("recieved secret pipe info.\n\nremoving well known pipe...\n");
   remove(WKP);
 
-  printf("removed well known pipe, trying to open secret pipe...\n");
+  printf("removed well known pipe\n\ntrying to open secret pipe...\n");
   printf("secret pipe: %s\n", handshake);
   *to_client = open(handshake, O_WRONLY);
   if (*to_client < 0) {
@@ -40,14 +41,15 @@ int server_handshake(int *to_client) {
     exit(EXIT_FAILURE);
   }
 
-  printf("opened secret pipe, sending ACK...\n");
+  printf("opened secret pipe.\n\nsending ACK...\n");
   int w = write(*to_client, ACK, sizeof(ACK));
   if (w != sizeof(ACK)) {
-    printf("couldn't send full ACK...\n");
+    printf("couldn't send full ACK\n");
+    printf("exiting...\n");
     exit(EXIT_FAILURE);
   }
 
-  printf("sent ACK... looking for final ACK from client...\n");
+  printf("sent ACK.\n\nlooking for final ACK from client...\n");
   r = read(wkp, handshake, sizeof(handshake));
   if (strcmp(handshake, ACK) != 0) {
     printf("recieved final handshake not as expected\n");
@@ -77,19 +79,66 @@ int client_handshake(int *to_server) {
 
   char pid[100];
   sprintf(pid, "%d", getpid());
+
   int from_server = mkfifo(pid, 0644);
   if (from_server) {
     printf("couldn't create secret pipe (%s, %d)\n", strerror(errno), errno);
     printf("tried creating secret pipe using name: %s\n", pid);
     exit(EXIT_FAILURE);
   }
+
+  printf("secret pipe name: %s\n", pid);
   
-  printf("opening well known pipe...\n");
+  printf("secret pipe created.\n\nopening well known pipe...\n");
   *to_server = open(WKP, O_WRONLY);
   if (*to_server < 0) {
     printf("couldn't open well known pipe (%s, %d)\n", strerror(errno), errno);
+    printf("removing secret pipe and exiting...\n");
+    remove(pid);
     exit(EXIT_FAILURE);
   }
 
+  printf("opened well known pipe.\n\nsending secret pipe info...\n");
+  int w = write(*to_server, pid, strlen(pid));
+  if (w != strlen(pid)) {  // TODO: actually check correct
+    printf("couldn't write secret pipe info");
+    printf("removing secret pipe and exiting...\n");
+    remove(pid);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("sent secret pipe info.\n\nopening secret pipe and waiting for ACK...\n");
+  from_server = open(pid, O_RDONLY);
+  if (from_server < 0) {
+    printf("couldn't open secret pipe (%s, %d)\n", strerror(errno), errno);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("opened secret pipe\n\nwaiting for ACK...\n");
+  char handshake[HANDSHAKE_BUFFER_SIZE];
+  int r = read(from_server, handshake, sizeof(handshake));
+  if (strcmp(handshake, ACK) != 0) {
+    printf("recieved final handshake not as expected\n");
+    printf("recieved: %s\n", handshake);
+    printf("expected: %s\n", ACK);
+
+    printf("removing secret pipe and exiting...\n");
+    remove(pid);
+    
+    exit(EXIT_FAILURE);
+  }
+
+  printf("recieved ACK.\n\nremoving secret pipe...\n");
+  remove(pid);
+
+  printf("removed secret pipe.\n\nsending final ACK...\n");
+  w = write(*to_server, ACK, sizeof(ACK));
+  if (w != sizeof(ACK)) {
+    printf("couldn't send full ACK...\n");
+    printf("exiting...\n");
+    exit(EXIT_FAILURE);
+  }
+
+  printf("final ACK sent, all done.\n");
   return from_server;
 }
