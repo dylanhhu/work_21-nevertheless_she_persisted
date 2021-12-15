@@ -11,7 +11,7 @@
   returns the file descriptor for the upstream pipe.
   =========================*/
 int server_handshake(int *to_client) {
-  printf("creating well known pipe...\n");
+  printf("\ncreating well known pipe...\n");
   int wkp = mkfifo(WKP, 0644);
   if (wkp) {
     printf("couldn't create well known pipe (%s, %d)\n", strerror(errno), errno);

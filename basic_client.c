@@ -19,12 +19,9 @@ int main() {
     printf(">>> ");
 
     fgets(input, sizeof(input), stdin);
-    if (input[0] == EOF) {
-      printf("recieved eof\n");
-    }
+    if (input[0] == '\n') continue;
     
     input[strlen(input) - 1] = 0;
-
     write(to_server, input, strlen(input));
 
     int r = read(from_server, input, sizeof(input));

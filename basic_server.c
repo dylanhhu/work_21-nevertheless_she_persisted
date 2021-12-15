@@ -18,9 +18,11 @@ int main() {
 
     while (1) {
       int r = read(from_client, data, sizeof(data));
+      if (r == 0) break;
+      
       data[r] = 0;
-
       reverse(data);
+
       write(to_client, data, strlen(data));
     }
   }
